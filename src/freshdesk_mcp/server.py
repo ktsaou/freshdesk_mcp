@@ -174,8 +174,36 @@ async def get_ticket_fields() -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def get_tickets(page: Optional[int] = 1, per_page: Optional[int] = 30) -> Dict[str, Any]:
-    """Get tickets from Freshdesk with pagination support."""
+async def get_tickets(
+    company_id: Optional[int] = None,
+    requester_id: Optional[int] = None,
+    email: Optional[str] = None,
+    updated_since: Optional[str] = None,
+    filter: Optional[str] = None,
+    order_by: Optional[str] = None,
+    order_type: Optional[str] = None,
+    page: Optional[int] = 1,
+    per_page: Optional[int] = 30
+) -> Dict[str, Any]:
+    """Get tickets from Freshdesk with filtering and pagination support.
+
+    This endpoint supports filtering by company_id, requester_id, email, etc.
+    For query-based filtering (status, priority, tags, etc.), use search_tickets instead.
+
+    Args:
+        company_id: Filter tickets by company ID
+        requester_id: Filter tickets by requester ID
+        email: Filter tickets by requester email
+        updated_since: Filter tickets updated since date (ISO 8601 format, e.g. '2024-01-01T00:00:00Z')
+        filter: Predefined filter name ('new_and_my_open', 'watching', 'spam', 'deleted')
+        order_by: Sort by field ('created_at', 'due_by', 'updated_at', 'status')
+        order_type: Sort order ('asc' or 'desc', default: 'desc')
+        page: Page number (default: 1)
+        per_page: Results per page (1-100, default: 30)
+
+    Returns:
+        Dict with tickets array and pagination info
+    """
     # Validate input parameters
     if page < 1:
         return {"error": "Page number must be greater than 0"}
@@ -185,10 +213,26 @@ async def get_tickets(page: Optional[int] = 1, per_page: Optional[int] = 30) -> 
 
     url = f"https://{FRESHDESK_DOMAIN}/api/v2/tickets"
 
+    # Build params dynamically, only including non-None values
     params = {
         "page": page,
         "per_page": per_page
     }
+
+    if company_id is not None:
+        params["company_id"] = company_id
+    if requester_id is not None:
+        params["requester_id"] = requester_id
+    if email is not None:
+        params["email"] = email
+    if updated_since is not None:
+        params["updated_since"] = updated_since
+    if filter is not None:
+        params["filter"] = filter
+    if order_by is not None:
+        params["order_by"] = order_by
+    if order_type is not None:
+        params["order_type"] = order_type
 
     headers = {
         "Authorization": f"Basic {base64.b64encode(f'{FRESHDESK_API_KEY}:X'.encode()).decode()}",
@@ -382,7 +426,38 @@ async def get_ticket(ticket_id: int):
 
 @mcp.tool()
 async def search_tickets(query: str) -> Dict[str, Any]:
-    """Search for tickets in Freshdesk."""
+    """Search for tickets in Freshdesk using the Filter Tickets API.
+
+    IMPORTANT: This API has strict limitations on searchable fields.
+
+    Supported fields in query:
+        - status: e.g. "status:2" (2=Open, 3=Pending, 4=Resolved, 5=Closed)
+        - priority: e.g. "priority:3" or "priority:>3" (1=Low, 2=Medium, 3=High, 4=Urgent)
+        - group_id: e.g. "group_id:11"
+        - requester_id: e.g. "requester_id:12345"
+        - type: e.g. "type:'Incident'"
+        - tag: e.g. "tag:'billing'"
+        - created_at: e.g. "created_at:>'2024-01-01'"
+        - updated_at: e.g. "updated_at:<'2024-06-01'"
+        - due_by: e.g. "due_by:>'2024-01-01'"
+        - Custom fields: e.g. "cf_fieldname:'value'" (use cf_ prefix)
+
+    NOT supported (will return 400 error):
+        - company_id: Use get_tickets(company_id=...) instead
+        - description, subject: Not searchable
+        - responder_id: Not filterable
+
+    Query syntax:
+        - Enclose in double quotes: "priority:4 AND status:2"
+        - Max 512 characters
+        - Operators: AND, OR, (), :> (>=), :< (<=)
+
+    Args:
+        query: Search query string (e.g. "priority:>3 AND status:2")
+
+    Returns:
+        Dict with matching tickets (max 300 results across 10 pages)
+    """
     url = f"https://{FRESHDESK_DOMAIN}/api/v2/search/tickets"
     headers = {
         "Authorization": f"Basic {base64.b64encode(f'{FRESHDESK_API_KEY}:X'.encode()).decode()}"
