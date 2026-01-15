@@ -476,9 +476,9 @@ async def search_tickets(query: str) -> Dict[str, Any]:
         - requester_id: e.g. "requester_id:12345"
         - type: e.g. "type:'Incident'"
         - tag: e.g. "tag:'billing'"
-        - created_at: e.g. "created_at:>'2024-01-01'"
-        - updated_at: e.g. "updated_at:<'2024-06-01'"
-        - due_by: e.g. "due_by:>'2024-01-01'"
+        - created_at: e.g. "created_at:>'2024-01-01'" (date format: 'YYYY-MM-DD')
+        - updated_at: e.g. "updated_at:<'2024-06-01'" (date format: 'YYYY-MM-DD')
+        - due_by: e.g. "due_by:>'2024-01-01'" (date format: 'YYYY-MM-DD')
         - Custom fields: e.g. "cf_fieldname:'value'" (use cf_ prefix)
 
     NOT supported (will return 400 error):
@@ -487,12 +487,14 @@ async def search_tickets(query: str) -> Dict[str, Any]:
         - responder_id: Not filterable
 
     Query syntax:
-        - Enclose in double quotes: "priority:4 AND status:2"
+        - Do NOT wrap in double quotes - it will be done automatically
         - Max 512 characters
         - Operators: AND, OR, (), :> (>=), :< (<=)
+        - Dates MUST be in 'YYYY-MM-DD' format with single quotes
 
     Args:
         query: Search query string (e.g. "priority:>3 AND status:2")
+               Do NOT wrap in double quotes - handled automatically.
 
     Returns:
         Dict with matching tickets (max 300 results across 10 pages)
@@ -501,7 +503,10 @@ async def search_tickets(query: str) -> Dict[str, Any]:
     headers = {
         "Authorization": f"Basic {base64.b64encode(f'{FRESHDESK_API_KEY}:X'.encode()).decode()}"
     }
-    params = {"query": query}
+    # Freshdesk API requires query to be wrapped in double quotes
+    # Strip any existing quotes and re-wrap to ensure correct format
+    clean_query = query.strip('"')
+    params = {"query": f'"{clean_query}"'}
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers, params=params)
         return response.json()
