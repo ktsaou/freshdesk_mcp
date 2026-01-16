@@ -470,18 +470,20 @@ async def search_tickets(query: str) -> Dict[str, Any]:
     IMPORTANT: This API has strict limitations on searchable fields.
 
     Supported fields in query:
-        - status: e.g. "status:2" (2=Open, 3=Pending, 4=Resolved, 5=Closed)
-        - priority: e.g. "priority:3" or "priority:>3" (1=Low, 2=Medium, 3=High, 4=Urgent)
+        - agent_id: e.g. "agent_id:123"
         - group_id: e.g. "group_id:11"
-        - requester_id: e.g. "requester_id:12345"
-        - type: e.g. "type:'Incident'"
+        - priority: e.g. "priority:3" or "priority:>3" (1=Low, 2=Medium, 3=High, 4=Urgent)
+        - status: e.g. "status:2" (2=Open, 3=Pending, 4=Resolved, 5=Closed)
         - tag: e.g. "tag:'billing'"
+        - type: e.g. "type:'Incident'"
+        - due_by: e.g. "due_by:>'2024-01-01'" (date format: 'YYYY-MM-DD')
+        - fr_due_by: e.g. "fr_due_by:<'2024-06-01'" (first response due by)
         - created_at: e.g. "created_at:>'2024-01-01'" (date format: 'YYYY-MM-DD')
         - updated_at: e.g. "updated_at:<'2024-06-01'" (date format: 'YYYY-MM-DD')
-        - due_by: e.g. "due_by:>'2024-01-01'" (date format: 'YYYY-MM-DD')
         - Custom fields: e.g. "cf_fieldname:'value'" (use cf_ prefix)
 
-    NOT supported (will return 400 error):
+    NOT supported (will return 400 "Validation failed" error):
+        - requester_id: Use get_tickets(requester_id=...) instead
         - company_id: Use get_tickets(company_id=...) instead
         - description, subject: Not searchable
         - responder_id: Not filterable
