@@ -6,6 +6,15 @@
 - Max per_page: 100
 - Use `page` parameter to paginate (starts at 1)
 - Link header contains next page URL
+- **Deep pagination warning**: Avoid page numbers over 500 - extremely slow response times
+
+## Autocomplete API Limitations
+
+All autocomplete endpoints (`/autocomplete`) have these limitations:
+- Returns LIMITED results (not paginated, typically ~10-20 matches)
+- Searches by PREFIX only (case insensitive)
+- Cannot search with substrings: "John" works, "ohn" does NOT
+- Returns minimal fields (usually just id and name)
 
 ## Tickets API
 
@@ -46,6 +55,36 @@ NOT supported: company_id, description, subject, responder_id
 
 Parameters:
 - `include`: 'stats', 'conversations', 'requester', 'company'
+
+**CRITICAL LIMITATION for include=conversations:**
+- Returns only the **OLDEST 10 conversations**, sorted by created_at ascending
+- This is NOT the full history - use GET /api/v2/tickets/{id}/conversations for complete data
+
+## Conversations API
+
+### GET /api/v2/tickets/{id}/conversations
+
+Lists ALL conversations (notes, replies) for a ticket with pagination.
+
+Parameters:
+- `page`: Page number (default: 1)
+- `per_page`: Results per page (1-100, default: 30)
+
+Returns: Array of conversation objects containing:
+- `id`: Conversation ID
+- `body`: HTML body
+- `body_text`: Plain text body
+- `incoming`: Boolean, true if from customer
+- `private`: Boolean, true if private note
+- `user_id`: ID of user who created it
+- `support_email`: Support email used
+- `source`: Source type (0=Reply, 2=Note, etc.)
+- `to_emails`, `from_email`, `cc_emails`, `bcc_emails`: Email addresses
+- `created_at`, `updated_at`: Timestamps
+- `attachments`: Array of attachment objects
+- `ticket_id`: Parent ticket ID
+
+Pagination: Standard Link header pagination. Use page parameter to iterate.
 
 ## Contacts API
 
