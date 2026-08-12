@@ -209,11 +209,15 @@ Once configured, you can ask Claude to perform operations like:
 
 ## Testing
 
-For testing purposes, you can start the server manually:
+Sync the locked environment and run the deterministic MCP startup smoke:
 
 ```bash
-uvx freshdesk-mcp --env FRESHDESK_API_KEY=<your_api_key> --env FRESHDESK_DOMAIN=<your_domain>
+uv sync --locked
+uv run python -m unittest discover -s tests -p 'test_*.py'
 ```
+
+The smoke uses placeholder credentials, initializes the stdio server, and lists
+its tools without making a Freshdesk API request.
 
 ## Troubleshooting
 
