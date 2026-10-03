@@ -1,5 +1,6 @@
 import httpx
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 import logging
 import os
 import base64
@@ -16,6 +17,28 @@ mcp = MCPServer("freshdesk-mcp")
 
 FRESHDESK_API_KEY = os.getenv("FRESHDESK_API_KEY")
 FRESHDESK_DOMAIN = os.getenv("FRESHDESK_DOMAIN")
+
+
+def _check_list_response(response: httpx.Response, tool_name: str) -> None:
+    """Keep HTTP failures out of successful list-typed tool results."""
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        logging.exception("Freshdesk %s request failed", tool_name)
+        status = response.status_code
+        guidance = "Use another available source or report this limitation."
+        if status in (401, 403):
+            guidance = "Access is denied; this request requires valid credentials and an authorized agent role. " + guidance
+        elif status == 429:
+            guidance = "The API rate limit was reached; retry later."
+        raise ToolError(f"{tool_name}: Freshdesk returned HTTP {status}. {guidance}") from error
+
+
+def _validate_list_pagination(page: Optional[int], per_page: Optional[int]) -> None:
+    if page is None or page < 1:
+        raise ToolError("page must be an integer greater than 0; use page=1 for the first page.")
+    if per_page is None or per_page < 1 or per_page > 100:
+        raise ToolError("per_page must be an integer between 1 and 100; use per_page=30 by default.")
 
 
 def parse_link_header(link_header: str) -> Dict[str, Optional[int]]:
@@ -162,7 +185,7 @@ class CannedResponseCreate(BaseModel):
     )
 
 @mcp.tool()
-async def get_ticket_fields() -> Dict[str, Any]:
+async def get_ticket_fields() -> list[Dict[str, Any]]:
     """Get all ticket fields from Freshdesk.
 
     Returns the list of ticket fields including custom fields.
@@ -177,6 +200,7 @@ async def get_ticket_fields() -> Dict[str, Any]:
     }
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers)
+        _check_list_response(response, "get_ticket_fields")
         return response.json()
 
 
@@ -674,12 +698,7 @@ async def get_agents(
         - contact: nested object with email, name, phone, mobile, language, time_zone
         - group_ids, role_ids, skill_ids, focus_mode
     """
-    # Validate input parameters
-    if page < 1:
-        return {"error": "Page number must be greater than 0"}
-
-    if per_page < 1 or per_page > 100:
-        return {"error": "Page size must be between 1 and 100"}
+    _validate_list_pagination(page, per_page)
     url = f"https://{FRESHDESK_DOMAIN}/api/v2/agents"
     headers = {
         "Authorization": f"Basic {base64.b64encode(f'{FRESHDESK_API_KEY}:X'.encode()).decode()}"
@@ -698,6 +717,7 @@ async def get_agents(
         params["state"] = state
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers, params=params)
+        _check_list_response(response, "get_agents")
         return response.json()
 
 @mcp.tool()
@@ -1169,6 +1189,7 @@ async def list_groups(page: Optional[int] = 1, per_page: Optional[int] = 30)-> l
         - escalate_to, unassigned_for, agent_ids
         - created_at, updated_at
     """
+    _validate_list_pagination(page, per_page)
     url = f"https://{FRESHDESK_DOMAIN}/api/v2/groups"
     headers = {
         "Authorization": f"Basic {base64.b64encode(f'{FRESHDESK_API_KEY}:X'.encode()).decode()}"
@@ -1179,6 +1200,7 @@ async def list_groups(page: Optional[int] = 1, per_page: Optional[int] = 30)-> l
     }
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers, params=params)
+        _check_list_response(response, "list_groups")
         return response.json()
 
 @mcp.tool()

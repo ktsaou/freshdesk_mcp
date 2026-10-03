@@ -219,11 +219,20 @@ uv run python -m unittest discover -s tests -p 'test_*.py'
 The smoke uses placeholder credentials, initializes the stdio server, and lists
 its tools without making a Freshdesk API request.
 
+The list-tool regressions exercise the real MCP output converter with mocked
+HTTP responses. `get_ticket_fields`, `get_agents`, and `list_groups` return arrays
+on success. HTTP failures return explicit tool errors instead of being passed
+to array-output validation; diagnostic tracebacks remain on server stderr.
+Agent/group pagination requires `page >= 1` and `1 <= per_page <= 100`, with
+defaults of 1 and 30. Invalid values are refused before any HTTP request.
+
 ## Troubleshooting
 
 - Verify your Freshdesk API key and domain are correct
 - Ensure proper network connectivity to Freshdesk servers
 - Check API rate limits and quotas
+- HTTP 401/403 from list tools requires valid credentials and an authorized
+  agent role. A server code fix does not grant additional account permissions.
 - Verify the `uvx` command is available in your PATH
 
 ## License
