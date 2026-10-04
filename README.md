@@ -209,6 +209,10 @@ Once configured, you can ask Claude to perform operations like:
 
 ## Testing
 
+The runtime uses an exact MCP SDK pin. Refresh that pin and `uv.lock` together;
+qualify dependency consistency and the mocked list-tool regressions as well as
+the real stdio discovery smoke before publishing a new source commit.
+
 Sync the locked environment and run the deterministic MCP startup smoke:
 
 ```bash
